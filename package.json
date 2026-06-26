@@ -8,7 +8,7 @@
     "start": "NODE_ENV=production tsx server.ts",
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "mkdir -p data && drizzle-kit migrate"
   },
   "dependencies": {
     "better-sqlite3": "^12.11.1",
