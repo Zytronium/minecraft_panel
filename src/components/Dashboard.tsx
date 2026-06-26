@@ -1,8 +1,10 @@
 "use client"
 
-import { useServerWebSocket, WireLogEntry } from "@/hooks/useServerWebSocket"
-import { useEffect, useRef, useState, KeyboardEvent } from "react"
+import { useServerWebSocket } from "@/hooks/useServerWebSocket"
+import { useState } from "react"
 import type { ServerStatus } from "@/lib/minecraft/manager"
+import ConsolePanel    from "./ConsolePanel"
+import PropertiesEditor from "./PropertiesEditor"
 
 // -------- config --------
 const STATUS: Record<ServerStatus, { label: string; color: string }> = {
@@ -12,44 +14,26 @@ const STATUS: Record<ServerStatus, { label: string; color: string }> = {
   stopping: { label: "Stopping", color: "var(--amber)"  },
 }
 
-const SOURCE_COLOR: Record<WireLogEntry["source"], string> = {
-  stdout: "var(--green)",
-  stderr: "var(--amber)",
-  system: "var(--muted)",
+type Tab = "console" | "properties"
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: "console",    label: "Console"    },
+  { id: "properties", label: "Properties" },
+]
+
+async function post(path: string) {
+  return fetch(path, { method: "POST" })
 }
 
-// -------- helpers --------
-function fmtTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("en-US", { hour12: false })
-}
-
-async function post(path: string, body?: unknown) {
-  return fetch(path, {
-    method:  "POST",
-    headers: body ? { "Content-Type": "application/json" } : undefined,
-    body:    body ? JSON.stringify(body) : undefined,
-  })
-}
-
-// -------- main component --------
+// -------- component --------
 export default function Dashboard() {
   const { logs, status, connected } = useServerWebSocket()
-  const [cmd, setCmd]               = useState("")
-  const [history, setHistory]       = useState<string[]>([])
-  const [histIdx, setHistIdx]       = useState(-1)
   const [busy, setBusy]             = useState<"start" | "stop" | null>(null)
-  const logEndRef = useRef<HTMLDivElement>(null)
-  const inputRef  = useRef<HTMLInputElement>(null)
+  const [activeTab, setActiveTab]   = useState<Tab>("console")
 
   const s           = STATUS[status]
   const statusColor = s.color
 
-  // -------- auto-scroll --------
-  useEffect(() => {
-    logEndRef.current?.scrollIntoView({ behavior: "instant" })
-  }, [logs])
-
-  // -------- server control handlers --------
   async function startServer() {
     setBusy("start")
     await post("/api/server/start")
@@ -60,32 +44,6 @@ export default function Dashboard() {
     setBusy("stop")
     await post("/api/server/stop")
     setBusy(null)
-  }
-
-  // -------- command handlers --------
-  async function sendCommand() {
-    const c = cmd.trim()
-    if (!c || status !== "running") return
-    await post("/api/server/command", { command: c })
-    setHistory(prev => [c, ...prev.slice(0, 49)])
-    setHistIdx(-1)
-    setCmd("")
-  }
-
-  function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter") {
-      sendCommand()
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault()
-      const next = Math.min(histIdx + 1, history.length - 1)
-      setHistIdx(next)
-      setCmd(history[next] ?? "")
-    } else if (e.key === "ArrowDown") {
-      e.preventDefault()
-      const next = Math.max(histIdx - 1, -1)
-      setHistIdx(next)
-      setCmd(next === -1 ? "" : history[next])
-    }
   }
 
   return (
@@ -144,87 +102,41 @@ export default function Dashboard() {
         </span>
       </div>
 
-      {/* -------- console log -------- */}
+      {/* -------- tab bar -------- */}
       <div style={{
-        flex: 1, overflow: "hidden", display: "flex", flexDirection: "column",
-        margin: "14px 20px 0",
-        borderLeft: `3px solid ${statusColor}`,
-        transition: "border-color 0.4s",
+        display: "flex", flexShrink: 0, padding: "0 20px",
+        background: "var(--surface)", borderBottom: "1px solid var(--border)",
       }}>
-        <div style={{
-          padding: "5px 14px", flexShrink: 0,
-          fontSize: "10px", color: "var(--dim)", letterSpacing: "0.1em",
-          background: "var(--surface)", borderBottom: "1px solid var(--border2)",
-        }}>
-          CONSOLE - {logs.length} lines
-        </div>
-        <div
-          style={{ flex: 1, overflowY: "auto", padding: "10px 14px" }}
-          onClick={() => inputRef.current?.focus()}
-        >
-          {logs.length === 0 ? (
-            <span style={{ color: "var(--dim)", fontSize: "13px" }}>
-              No output yet. Start the server to see logs.
-            </span>
-          ) : logs.map((log, i) => (
-            <div
-              key={i}
+        {TABS.map(tab => {
+          const active = activeTab === tab.id
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
               style={{
-                display: "flex", gap: "12px",
-                fontSize: "13px", lineHeight: "1.65",
-                color: SOURCE_COLOR[log.source],
+                padding: "9px 16px", background: "transparent", border: "none",
+                borderBottom: `2px solid ${active ? statusColor : "transparent"}`,
+                color: active ? "var(--text)" : "var(--muted)",
+                fontFamily: "inherit", fontSize: "12px", cursor: "pointer",
+                letterSpacing: "0.04em", marginBottom: "-1px",
+                transition: "color 0.2s, border-color 0.2s",
               }}
             >
-              <span style={{
-                color: "var(--dim)", flexShrink: 0,
-                fontSize: "11px", paddingTop: "3px", userSelect: "none",
-              }}>
-                {fmtTime(log.timestamp)}
-              </span>
-              <span style={{ wordBreak: "break-all" }}>{log.message}</span>
-            </div>
-          ))}
-          <div ref={logEndRef} />
-        </div>
+              {tab.label.toUpperCase()}
+            </button>
+          )
+        })}
       </div>
 
-      {/* -------- command input -------- */}
+      {/* -------- content area -------- */}
       <div style={{
-        display: "flex", alignItems: "center", gap: "10px",
-        padding: "10px 14px 14px",
-        margin: "0 20px 16px",
-        borderTop: "1px solid var(--border2)",
+        flex: 1, overflow: "hidden", display: "flex", flexDirection: "column",
         borderLeft: `3px solid ${statusColor}`,
+        margin: "14px 20px 16px",
         transition: "border-color 0.4s",
       }}>
-        <span style={{ color: "var(--dim)", fontSize: "13px", userSelect: "none" }}>$</span>
-        <input
-          ref={inputRef}
-          value={cmd}
-          onChange={e => { setCmd(e.target.value); setHistIdx(-1) }}
-          onKeyDown={onKeyDown}
-          disabled={status !== "running"}
-          placeholder={status === "running" ? "Enter command..." : "Server offline"}
-          autoComplete="off"
-          spellCheck={false}
-          style={{
-            flex: 1, background: "transparent", border: "none", outline: "none",
-            color: "var(--text)", fontFamily: "inherit", fontSize: "13px",
-            opacity: status !== "running" ? 0.35 : 1,
-          }}
-        />
-        <button
-          onClick={sendCommand}
-          disabled={status !== "running" || !cmd.trim()}
-          style={{
-            padding: "4px 12px", background: "transparent", cursor: "pointer",
-            border: "1px solid var(--border)", borderRadius: "4px",
-            color: "var(--muted)", fontFamily: "inherit", fontSize: "12px",
-            opacity: status !== "running" || !cmd.trim() ? 0.3 : 1,
-          }}
-        >
-          Send
-        </button>
+        {activeTab === "console"    && <ConsolePanel logs={logs} status={status} />}
+        {activeTab === "properties" && <PropertiesEditor />}
       </div>
 
     </div>
@@ -252,8 +164,7 @@ function ControlBtn({ label, onClick, disabled, color, filled }: ControlBtnProps
         color:      filled ? "#fff" : color,
         fontFamily: "inherit", fontSize: "12px",
         cursor: disabled ? "not-allowed" : "pointer",
-        opacity: disabled ? 0.4 : 1,
-        transition: "opacity 0.2s",
+        opacity: disabled ? 0.4 : 1, transition: "opacity 0.2s",
         letterSpacing: "0.03em",
       }}
     >
