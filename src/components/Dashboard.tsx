@@ -5,6 +5,7 @@ import { useState } from "react"
 import type { ServerStatus } from "@/lib/minecraft/manager"
 import ConsolePanel    from "./ConsolePanel"
 import PropertiesEditor from "./PropertiesEditor"
+import WhitelistEditor from "./WhitelistEditor"
 
 // -------- config --------
 const STATUS: Record<ServerStatus, { label: string; color: string }> = {
@@ -14,11 +15,12 @@ const STATUS: Record<ServerStatus, { label: string; color: string }> = {
   stopping: { label: "Stopping", color: "var(--amber)"  },
 }
 
-type Tab = "console" | "properties"
+type Tab = "console" | "properties" | "whitelist"
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "console",    label: "Console"    },
   { id: "properties", label: "Properties" },
+  { id: "whitelist",  label: "Whitelist"  },
 ]
 
 async function post(path: string) {
@@ -137,6 +139,7 @@ export default function Dashboard() {
       }}>
         {activeTab === "console"    && <ConsolePanel logs={logs} status={status} />}
         {activeTab === "properties" && <PropertiesEditor />}
+        {activeTab === "whitelist"  && <WhitelistEditor />}
       </div>
 
     </div>

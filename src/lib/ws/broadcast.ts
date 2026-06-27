@@ -1,26 +1,27 @@
 import { WebSocket, WebSocketServer } from "ws"
 import { minecraftManager, LogEntry, ServerStatus } from "../minecraft/manager"
 
-// -------- types --------
 export type WsMessage =
-  | { type: "log";    data: LogEntry }
-  | { type: "status"; data: ServerStatus }
+  | { type: "log";     data: LogEntry }
+  | { type: "status";  data: ServerStatus }
   | { type: "history"; data: LogEntry[] }
 
-// -------- broadcast to all connected clients --------
-function broadcast(wss: WebSocketServer, message: WsMessage) {
-  const payload = JSON.stringify(message)
-  for (const client of wss.clients) {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(payload)
-    }
+function safeSend(ws: WebSocket, payload: string) {
+  try {
+    if (ws.readyState === WebSocket.OPEN) ws.send(payload)
+  } catch (err) {
+    console.error("[ws] send error:", (err as Error).message)
   }
 }
 
-// -------- attach wss to the minecraft manager --------
-export function attachWebSocketServer(wss: WebSocketServer) {
+function broadcast(wss: WebSocketServer, message: WsMessage) {
+  const payload = JSON.stringify(message)
+  for (const client of wss.clients) safeSend(client, payload)
+}
 
-  // -------- forward live events to all clients --------
+export function attachWebSocketServer(wss: WebSocketServer) {
+  wss.on("error", (err) => console.error("[wss] server error:", err.message))
+
   minecraftManager.on("log", (entry: LogEntry) => {
     broadcast(wss, { type: "log", data: entry })
   })
@@ -29,14 +30,9 @@ export function attachWebSocketServer(wss: WebSocketServer) {
     broadcast(wss, { type: "status", data: status })
   })
 
-  // -------- send history + current status on new connection --------
   wss.on("connection", (ws) => {
-    const history = minecraftManager.logBuffer
-    ws.send(JSON.stringify({ type: "history", data: history } satisfies WsMessage))
-    ws.send(JSON.stringify({ type: "status", data: minecraftManager.status } satisfies WsMessage))
-
-    ws.on("error", (err) => {
-      console.error("[ws] client error:", err.message)
-    })
+    safeSend(ws, JSON.stringify({ type: "history", data: minecraftManager.logBuffer }))
+    safeSend(ws, JSON.stringify({ type: "status", data: minecraftManager.status }))
+    ws.on("error", (err) => console.error("[ws] client error:", err.message))
   })
 }
