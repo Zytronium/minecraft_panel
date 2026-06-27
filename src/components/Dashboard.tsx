@@ -29,12 +29,13 @@ async function post(path: string) {
 
 // -------- component --------
 export default function Dashboard() {
-  const { logs, status, connected } = useServerWebSocket()
+  const { logs, status, players, connected } = useServerWebSocket()
   const [busy, setBusy]             = useState<"start" | "stop" | null>(null)
   const [activeTab, setActiveTab]   = useState<Tab>("console")
 
   const s           = STATUS[status]
   const statusColor = s.color
+  const isRunning   = status === "running"
 
   async function startServer() {
     setBusy("start")
@@ -130,11 +131,16 @@ export default function Dashboard() {
         })}
       </div>
 
-      {/* -------- content area -------- */}
+      {/* -------- content + sidebar -------- */}
+      <div style={{
+        flex: 1, overflow: "hidden", display: "flex", flexDirection: "row",
+        gap: "14px", padding: "14px 20px 16px",
+      }}>
+
+        {/* -------- main content -------- */}
       <div style={{
         flex: 1, overflow: "hidden", display: "flex", flexDirection: "column",
         borderLeft: `3px solid ${statusColor}`,
-        margin: "14px 20px 16px",
         transition: "border-color 0.4s",
       }}>
         {activeTab === "console"    && <ConsolePanel logs={logs} status={status} />}
@@ -142,6 +148,78 @@ export default function Dashboard() {
         {activeTab === "whitelist"  && <WhitelistEditor />}
       </div>
 
+        {/* -------- players sidebar -------- */}
+        <div style={{
+          width: "180px", flexShrink: 0, display: "flex", flexDirection: "column",
+          background: "var(--surface)", border: "1px solid var(--border)",
+          borderRadius: "4px", overflow: "hidden",
+        }}>
+          {/* sidebar header */}
+          <div style={{
+            padding: "7px 10px", borderBottom: "1px solid var(--border2)",
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            flexShrink: 0,
+          }}>
+            <span style={{ fontSize: "11px", letterSpacing: "0.07em", color: "var(--muted)" }}>
+              PLAYERS
+            </span>
+            <span style={{
+              fontSize: "11px", color: isRunning ? "var(--green)" : "var(--dim)",
+              transition: "color 0.3s",
+            }}>
+              {isRunning ? `${players.length} online` : "-"}
+            </span>
+          </div>
+
+          {/* sidebar body */}
+          <div style={{ flex: 1, overflowY: "auto" }}>
+            {!isRunning ? (
+              <div style={{
+                padding: "16px 10px", fontSize: "11px",
+                color: "var(--dim)", textAlign: "center", lineHeight: "1.6",
+              }}>
+                Server offline
+              </div>
+            ) : players.length === 0 ? (
+              <div style={{
+                padding: "16px 10px", fontSize: "11px",
+                color: "var(--dim)", textAlign: "center", lineHeight: "1.6",
+              }}>
+                No players online
+              </div>
+            ) : players.map(p => (
+              <div
+                key={p.name}
+                style={{
+                  display: "flex", alignItems: "center", gap: "8px",
+                  padding: "6px 10px", borderBottom: "1px solid var(--border2)",
+                }}
+              >
+                {p.uuid ? (
+                  <img
+                    src={`https://mc-heads.net/avatar/${p.uuid}/20`}
+                    alt={p.name}
+                    width={20} height={20}
+                    style={{ borderRadius: "2px", imageRendering: "pixelated", flexShrink: 0 }}
+                  />
+                ) : (
+                  <div style={{
+                    width: 20, height: 20, flexShrink: 0, borderRadius: "2px",
+                    background: "var(--border)", opacity: 0.5,
+                  }} />
+                )}
+                <span style={{
+                  fontSize: "12px", color: "var(--text)",
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                }}>
+                  {p.name}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+      </div>
     </div>
   )
 }

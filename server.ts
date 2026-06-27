@@ -5,7 +5,7 @@ import { attachWebSocketServer } from "./src/lib/ws/broadcast"
 import { initWhitelistQueue } from "./src/lib/minecraft/whitelist"
 
 const dev      = process.env.NODE_ENV !== "production"
-const hostname = "127.0.0.1"
+const hostname = dev ? "127.0.0.1" : "0.0.0.0"
 const port     = 3000
 
 const app    = next({ dev, hostname, port })

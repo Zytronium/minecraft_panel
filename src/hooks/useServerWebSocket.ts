@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import type { ServerStatus } from "@/lib/minecraft/manager"
+import type { ServerStatus, OnlinePlayer } from "@/lib/minecraft/manager"
 
 export interface WireLogEntry {
   message:   string
@@ -10,8 +10,9 @@ export interface WireLogEntry {
 }
 
 export function useServerWebSocket() {
-  const [logs, setLogs]           = useState<WireLogEntry[]>([])
-  const [status, setStatus]       = useState<ServerStatus>("stopped")
+  const [logs, setLogs]         = useState<WireLogEntry[]>([])
+  const [status, setStatus]     = useState<ServerStatus>("stopped")
+  const [players, setPlayers]   = useState<OnlinePlayer[]>([])
   const [connected, setConnected] = useState(false)
   const wsRef = useRef<WebSocket | null>(null)
 
@@ -37,6 +38,7 @@ export function useServerWebSocket() {
         if      (msg.type === "history") setLogs(msg.data)
         else if (msg.type === "log")     setLogs(prev => [...prev.slice(-499), msg.data])
         else if (msg.type === "status")  setStatus(msg.data)
+        else if (msg.type === "players") setPlayers(msg.data)
       }
     }
 
@@ -44,5 +46,5 @@ export function useServerWebSocket() {
     return () => { cancelled = true; wsRef.current?.close() }
   }, [])
 
-  return { logs, status, connected }
+  return { logs, status, players, connected }
 }
