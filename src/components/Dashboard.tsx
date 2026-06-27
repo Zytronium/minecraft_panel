@@ -6,6 +6,7 @@ import type { ServerStatus } from "@/lib/minecraft/manager"
 import ConsolePanel    from "./ConsolePanel"
 import PropertiesEditor from "./PropertiesEditor"
 import WhitelistEditor from "./WhitelistEditor"
+import FileManager from "./FileManager"
 
 // -------- config --------
 const STATUS: Record<ServerStatus, { label: string; color: string }> = {
@@ -15,12 +16,13 @@ const STATUS: Record<ServerStatus, { label: string; color: string }> = {
   stopping: { label: "Stopping", color: "var(--amber)"  },
 }
 
-type Tab = "console" | "properties" | "whitelist"
+type Tab = "console" | "properties" | "whitelist" | "files"
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "console",    label: "Console"    },
   { id: "properties", label: "Properties" },
   { id: "whitelist",  label: "Whitelist"  },
+  { id: "files",      label: "Files"      },
 ]
 
 async function post(path: string) {
@@ -146,6 +148,7 @@ export default function Dashboard() {
         {activeTab === "console"    && <ConsolePanel logs={logs} status={status} />}
         {activeTab === "properties" && <PropertiesEditor />}
         {activeTab === "whitelist"  && <WhitelistEditor />}
+        {activeTab === "files"      && <FileManager />}
       </div>
 
         {/* -------- players sidebar -------- */}
